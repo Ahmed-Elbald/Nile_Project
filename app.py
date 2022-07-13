@@ -12,7 +12,7 @@ if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://")
 db = SQL(uri)
 
-app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_PERMANENT"] = True
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
@@ -43,7 +43,7 @@ def signup():
         country = request.form.get("country")
         city = request.form.get("city")
         gender = request.form.get("gender")
-        time = date.today().strftime("%d %B %Y")
+        time = datetime.now().strftime("%d %B %Y")
 
 
         if not password == password_conf:
@@ -74,13 +74,13 @@ def signup():
         if not len(users_username) == 0:
             flash("username is taken")
             return redirect("/signup")
-        
+
         users_email = db.execute(
             "SELECT * FROM users WHERE email = ?", email)
         if not len(users_email) == 0:
             flash("this email is already associated with another account")
             return redirect("/signup")
-        
+
         users_phone = db.execute(
             "SELECT * FROM users WHERE phone = ?", phone)
         if not len(users_phone) == 0:
@@ -88,8 +88,8 @@ def signup():
             return redirect("/signup")
 
         hashed = generate_password_hash(password)
-        db.execute("INSERT INTO users (firstname,lastname,hash,username,phone,email,time,country,city,gender,state) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    firstname, lastname, hashed, username, phone, email, time,country,city,gender,"active")
+        db.execute("INSERT INTO users (firstname,lastname,hash,username,phone,email,time,country,city,gender) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    firstname, lastname, hashed, username, phone, email, time,country,city,gender)
         row = db.execute(
             "SELECT id FROM users WHERE username = ?", username)
         db.execute("INSERT INTO bios (user_id) VALUES(?)", row[0]["id"])
@@ -113,13 +113,8 @@ def signin():
         if len(rows) != 1 or not check_password_hash(rows[0]["hash"], password):
             flash("username and/or password aren't correct")
             return render_template("signin.html")
-        
-        if rows[0]["state"] == "active":
-            flash("you are already signed in on another device")
-            return render_template("signin.html")
 
         session["user_id"] = rows[0]["id"]
-        db.execute("UPDATE users SET state = ? WHERE id = ?", "active",rows[0]["id"])
         return redirect("/home")
 
 
@@ -127,9 +122,7 @@ def signin():
 def logout():
     if session.get("user_id")  == None:
             return redirect("/")
-    
-    db.execute("UPDATE users SET state = ? WHERE id = ?", "not active",session["user_id"])
-    
+
     session.clear()
 
     return redirect("/")
@@ -142,16 +135,16 @@ def home():
         now = datetime.now()
         user_id = session["user_id"]
         today_date = now.strftime("%B, %Y")
-        
-        
+
+
         notes_count = db.execute("SELECT COUNT(*) FROM notes WHERE user_id = ?",user_id)[0]["count"]
         notes_m_count = db.execute("SELECT COUNT(*) FROM notes WHERE date LIKE ? AND user_id = ?", '%'+today_date,user_id)[0]["count"]
         diary_count = db.execute("SELECT COUNT(*) FROM diary WHERE user_id = ?",user_id)[0]["count"]
         diary_m_count = db.execute("SELECT COUNT(*) FROM diary WHERE date LIKE ? AND user_id = ?", '%'+today_date,user_id)[0]["count"]
-        
+
         arr = [notes_count,notes_m_count,diary_count,diary_m_count]
-        
-        
+
+
 
         return render_template("home.html",arr=arr)
 
@@ -313,7 +306,7 @@ def settings():
                     return redirect("/settings#info")
                 elif field_name == "status":
                     status = request.form.get("status")
-                    db.execute("UPDATE users SET 'marital-status' = ? WHERE id = ?", status,user_id)
+                    db.execute("UPDATE users SET status = ? WHERE id = ?", status,user_id)
                     return redirect("/settings#info")
                 elif field_name == "bio":
                     bio = request.form.get("bio")
